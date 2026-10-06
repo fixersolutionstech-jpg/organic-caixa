@@ -1,0 +1,371 @@
+<!doctype html>
+<html lang="pt">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f1412">
+<title>Organic</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0f1412; --card:#172019; --card2:#1d2820; --line:#2a3a2e;
+  --tx:#e9efe9; --mut:#8fa596; --ac:#7ed49a; --ac2:#4fae70;
+  --in:#7ed49a; --out:#ef8a7a; --tr:#e6c36a;
+  --r:16px;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--tx);font-family:Inter,system-ui,sans-serif}
+body{padding:0 16px calc(96px + env(safe-area-inset-bottom));max-width:560px;margin:0 auto}
+header{display:flex;align-items:center;justify-content:space-between;padding:18px 0 10px}
+header h1{font-size:20px;margin:0;letter-spacing:.5px}
+header h1 span{color:var(--ac)}
+#net{font-size:12px;color:var(--mut);display:flex;gap:6px;align-items:center}
+#net i{width:8px;height:8px;border-radius:50%;background:var(--ac);display:inline-block}
+#net.off i{background:var(--out)}
+.view{display:none}.view.on{display:block}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:16px;margin:12px 0}
+label.l{display:block;font-size:12px;color:var(--mut);margin:14px 0 6px;text-transform:uppercase;letter-spacing:.8px}
+.seg{display:flex;background:var(--card2);border-radius:12px;padding:4px;gap:4px}
+.seg button{flex:1;border:0;background:none;color:var(--mut);padding:10px 4px;border-radius:9px;font:600 14px Inter}
+.seg button.on[data-v=saida]{background:var(--out);color:#2a0f0a}
+.seg button.on[data-v=entrada]{background:var(--in);color:#0b2414}
+.seg button.on[data-v=transferencia]{background:var(--tr);color:#2a2008}
+.valor{display:flex;align-items:baseline;gap:8px;border-bottom:2px solid var(--line);padding:6px 0}
+.valor input{flex:1;min-width:0;background:none;border:0;color:var(--tx);font:700 40px "JetBrains Mono",monospace;outline:none}
+.valor small{color:var(--mut);font-weight:600}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chips button{border:1px solid var(--line);background:var(--card2);color:var(--tx);padding:8px 12px;border-radius:999px;font:500 14px Inter}
+.chips button.on{border-color:var(--ac);background:#1f3a28;color:var(--ac)}
+input.t,select.t{width:100%;background:var(--card2);border:1px solid var(--line);color:var(--tx);border-radius:12px;padding:12px;font:15px Inter;outline:none}
+input.t:focus,select.t:focus{border-color:var(--ac2)}
+.row{display:flex;gap:10px}.row>*{flex:1}
+.btn{width:100%;border:0;border-radius:14px;padding:16px;font:700 16px Inter;margin-top:18px;background:var(--ac);color:#0b2414}
+.btn.sec{background:var(--card2);color:var(--tx);border:1px solid var(--line)}
+.btn.neg{background:none;color:var(--out);border:1px solid #5a2f28}
+.btn:disabled{opacity:.5}
+nav{position:fixed;left:0;right:0;bottom:0;background:#0b0f0d;border-top:1px solid var(--line);display:flex;justify-content:center;padding-bottom:env(safe-area-inset-bottom)}
+nav .in{display:flex;max-width:560px;width:100%}
+nav button{flex:1;border:0;background:none;color:var(--mut);padding:12px 0 10px;font:600 12px Inter;position:relative}
+nav button b{display:block;font-size:20px;margin-bottom:2px}
+nav button.on{color:var(--ac)}
+.badge{position:absolute;top:6px;left:55%;background:var(--out);color:#fff;font-size:11px;border-radius:999px;padding:1px 6px;display:none}
+.mov{display:flex;justify-content:space-between;gap:10px;padding:12px 0;border-bottom:1px solid var(--line)}
+.mov:last-child{border:0}
+.mov .d{font-size:12px;color:var(--mut);margin-top:3px}
+.mov .v{font:700 15px "JetBrains Mono",monospace;white-space:nowrap}
+.v.entrada{color:var(--in)}.v.saida{color:var(--out)}.v.transferencia{color:var(--tr)}
+.saldo{display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--line)}
+.saldo:last-child{border:0}
+.saldo b{font-family:"JetBrains Mono",monospace}
+.total{font:700 32px "JetBrains Mono",monospace;margin:4px 0 0}
+.pend{border-left:4px solid var(--tr)}
+.pend.hl{box-shadow:0 0 0 2px var(--tr)}
+.sms{font-size:12px;color:var(--mut);background:var(--card2);border-radius:10px;padding:10px;margin-bottom:6px;white-space:pre-wrap;word-break:break-word}
+.vazio{text-align:center;color:var(--mut);padding:30px 0}
+#toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%) translateY(20px);background:var(--tx);color:var(--bg);padding:12px 18px;border-radius:12px;font-weight:600;opacity:0;transition:.25s;pointer-events:none;max-width:90%;text-align:center}
+#toast.on{opacity:1;transform:translateX(-50%)}
+.fila{font-size:13px;color:var(--tr);margin-top:10px;display:none}
+.hint{font-size:12px;color:var(--mut);margin-top:6px}
+</style>
+</head>
+<body>
+<header>
+  <h1>The <span>Organic</span></h1>
+  <div id="net"><i></i><span>online</span></div>
+</header>
+
+<!-- REGISTAR -->
+<section class="view on" id="v-reg">
+  <div class="card" id="form-reg"></div>
+  <div class="fila" id="fila"></div>
+</section>
+
+<!-- APROVAR -->
+<section class="view" id="v-apr">
+  <div id="lista-pend"></div>
+</section>
+
+<!-- SALDO -->
+<section class="view" id="v-sal">
+  <div class="card">
+    <label class="l" style="margin-top:0">Total</label>
+    <div class="total" id="total">—</div>
+    <div id="saldos" style="margin-top:10px"></div>
+  </div>
+  <div class="card">
+    <label class="l" style="margin-top:0">Recentes</label>
+    <div id="recentes"></div>
+  </div>
+  <button class="btn sec" onclick="carregar(true)">Actualizar</button>
+</section>
+
+<!-- DEFINIÇÕES -->
+<section class="view" id="v-def">
+  <div class="card">
+    <label class="l" style="margin-top:0">URL do GAS (/exec)</label>
+    <input class="t" id="d-url" placeholder="https://script.google.com/macros/s/…/exec">
+    <label class="l">Token</label>
+    <input class="t" id="d-tok" type="password" placeholder="o mesmo TOKEN do Apps Script">
+    <label class="l">Contas (separadas por vírgula)</label>
+    <input class="t" id="d-contas">
+    <label class="l">Categorias de saída</label>
+    <input class="t" id="d-cs">
+    <label class="l">Categorias de entrada</label>
+    <input class="t" id="d-ce">
+    <button class="btn" onclick="guardarDef()">Guardar</button>
+    <button class="btn sec" onclick="testar()">Testar ligação</button>
+    <p class="hint">Saldo inicial de cada conta: regista uma entrada com a categoria "Saldo inicial".</p>
+  </div>
+</section>
+
+<nav><div class="in">
+  <button data-v="reg" class="on"><b>＋</b>Registar</button>
+  <button data-v="apr"><b>✓</b>Aprovar<span class="badge" id="badge"></span></button>
+  <button data-v="sal"><b>◎</b>Saldo</button>
+  <button data-v="def"><b>⚙</b>Definições</button>
+</div></nav>
+
+<div id="toast"></div>
+
+<script>
+/* ---------- estado e definições ---------- */
+const DEF = {
+  url: '', token: '',
+  contas: ['Caixa', 'M-Pesa', 'e-Mola', 'Banco'],
+  cs: ['Alimentação', 'Transporte', 'Casa', 'Comunicação', 'Saúde', 'Pessoal', 'Lazer', 'Aporte Fixer', 'Outros'],
+  ce: ['Rendimento', 'Salário', 'Reembolso Fixer', 'Saldo inicial', 'Outros']
+};
+const ls = {
+  get(k, d) { try { const v = localStorage.getItem('org_' + k); return v ? JSON.parse(v) : d; } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem('org_' + k, JSON.stringify(v)); } catch (e) {} }
+};
+let cfg = Object.assign({}, DEF, ls.get('cfg', {}));
+let dados = ls.get('cache', { pendentes: [], saldos: {}, recentes: [] });
+let fila = ls.get('fila', []);
+const alvo = new URLSearchParams(location.search).get('id'); // deep link do Termux
+
+/* ---------- utilitários ---------- */
+const $ = s => document.querySelector(s);
+const fmt = n => new Intl.NumberFormat('pt-PT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n || 0);
+const hoje = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Maputo' });
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const num = s => Number(String(s).replace(/\s/g, '').replace(',', '.')) || 0;
+function toast(m) { const t = $('#toast'); t.textContent = m; t.classList.add('on'); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('on'), 2200); }
+const SINAL = { entrada: '+', saida: '−', transferencia: '⇄' };
+
+/* ---------- API ---------- */
+async function api(body) {
+  if (!cfg.url) throw new Error('Configura o URL do GAS');
+  const r = await fetch(cfg.url, {
+    method: 'POST', redirect: 'follow',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // evita preflight CORS
+    body: JSON.stringify(Object.assign({ token: cfg.token }, body))
+  });
+  const j = await r.json();
+  if (!j.ok) throw new Error(j.erro || 'erro');
+  return j;
+}
+async function apiGet() {
+  if (!cfg.url) throw new Error('Configura o URL do GAS');
+  const r = await fetch(cfg.url + '?acao=listar&token=' + encodeURIComponent(cfg.token));
+  const j = await r.json();
+  if (!j.ok) throw new Error(j.erro || 'erro');
+  return j;
+}
+
+/* ---------- formulário de movimento (reutilizável) ---------- */
+function formMov(el, m, onSave, extra) {
+  m = Object.assign({ tipo: 'saida', valor: '', conta: 'Caixa', conta_destino: '', categoria: '', descricao: '', data: hoje() }, m);
+  const render = () => {
+    const cats = m.tipo === 'entrada' ? cfg.ce : cfg.cs;
+    const chips = (arr, sel, k) => arr.map(c => `<button type="button" data-k="${k}" data-c="${esc(c)}" class="${c === sel ? 'on' : ''}">${esc(c)}</button>`).join('');
+    el.innerHTML = `
+      ${extra || ''}
+      <div class="seg">${['saida', 'entrada', 'transferencia'].map(t =>
+        `<button type="button" data-v="${t}" class="${m.tipo === t ? 'on' : ''}">${{ saida: 'Saída', entrada: 'Entrada', transferencia: 'Transferir' }[t]}</button>`).join('')}</div>
+      <label class="l">Valor</label>
+      <div class="valor"><input inputmode="decimal" placeholder="0,00" value="${m.valor === '' ? '' : esc(String(m.valor).replace('.', ','))}"><small>MZN</small></div>
+      <label class="l">${m.tipo === 'transferencia' ? 'De' : 'Conta'}</label>
+      <div class="chips">${chips(cfg.contas, m.conta, 'conta')}</div>
+      ${m.tipo === 'transferencia'
+        ? `<label class="l">Para</label><div class="chips">${chips(cfg.contas.filter(c => c !== m.conta), m.conta_destino, 'conta_destino')}</div>`
+        : `<label class="l">Categoria</label><div class="chips">${chips(cats, m.categoria, 'categoria')}</div>`}
+      <label class="l">Descrição</label>
+      <input class="t desc" placeholder="opcional" value="${esc(m.descricao)}">
+      <label class="l">Data</label>
+      <input class="t data" type="date" value="${esc(m.data)}">
+      <div class="acoes"></div>`;
+    el.querySelectorAll('.seg button').forEach(b => b.onclick = () => { m.tipo = b.dataset.v; m.categoria = ''; render(); });
+    el.querySelectorAll('.chips button').forEach(b => b.onclick = () => { m[b.dataset.k] = b.dataset.c; if (b.dataset.k === 'conta' && m.conta_destino === m.conta) m.conta_destino = ''; render(); });
+    el.querySelector('.valor input').oninput = e => m.valor = e.target.value;
+    el.querySelector('.desc').oninput = e => m.descricao = e.target.value;
+    el.querySelector('.data').onchange = e => m.data = e.target.value;
+    onSave(el.querySelector('.acoes'), () => {
+      const v = num(m.valor);
+      if (v <= 0) { toast('Indica o valor'); return null; }
+      if (m.tipo === 'transferencia' && !m.conta_destino) { toast('Escolhe a conta de destino'); return null; }
+      if (m.tipo !== 'transferencia' && !m.categoria) { toast('Escolhe a categoria'); return null; }
+      return Object.assign({}, m, { valor: v, conta_destino: m.tipo === 'transferencia' ? m.conta_destino : '' });
+    }, () => { m = { tipo: m.tipo, valor: '', conta: m.conta, conta_destino: '', categoria: '', descricao: '', data: hoje() }; render(); });
+  };
+  render();
+}
+
+/* ---------- registar (caixa físico e qualquer conta) ---------- */
+function montarRegisto() {
+  formMov($('#form-reg'), {}, (acoes, ler, limpar) => {
+    acoes.innerHTML = '<button class="btn">Guardar</button>';
+    acoes.firstChild.onclick = async () => {
+      const m = ler(); if (!m) return;
+      m.id = uid();
+      fila.push(m); ls.set('fila', fila);
+      // reflecte já localmente
+      aplicarLocal(m);
+      limpar();
+      toast(`${SINAL[m.tipo]} ${fmt(m.valor)} MZN registado`);
+      enviarFila();
+    };
+  });
+}
+function aplicarLocal(m) {
+  const s = dados.saldos;
+  if (m.tipo === 'entrada') s[m.conta] = (s[m.conta] || 0) + m.valor;
+  else if (m.tipo === 'saida') s[m.conta] = (s[m.conta] || 0) - m.valor;
+  else { s[m.conta] = (s[m.conta] || 0) - m.valor; s[m.conta_destino] = (s[m.conta_destino] || 0) + m.valor; }
+  dados.recentes.unshift(Object.assign({ estado: 'aprovado' }, m));
+  ls.set('cache', dados); pintarSaldo();
+}
+
+/* ---------- fila offline ---------- */
+let aEnviar = false;
+async function enviarFila() {
+  mostrarFila();
+  if (aEnviar || !fila.length || !navigator.onLine || !cfg.url) return;
+  aEnviar = true;
+  try {
+    while (fila.length) {
+      await api({ acao: 'registar', mov: fila[0] }); // id torna o envio idempotente
+      fila.shift(); ls.set('fila', fila); mostrarFila();
+    }
+  } catch (e) { /* tenta mais tarde */ }
+  aEnviar = false;
+  mostrarFila();
+}
+function mostrarFila() {
+  const f = $('#fila');
+  f.style.display = fila.length ? 'block' : 'none';
+  f.textContent = `⏳ ${fila.length} registo(s) à espera de envio — sai automaticamente quando houver rede.`;
+}
+
+/* ---------- aprovar pendentes (SMS) ---------- */
+function pintarPendentes() {
+  const box = $('#lista-pend');
+  const p = dados.pendentes || [];
+  const n = p.length;
+  const b = $('#badge'); b.textContent = n; b.style.display = n ? 'block' : 'none';
+  if ('setAppBadge' in navigator) { n ? navigator.setAppBadge(n).catch(() => {}) : navigator.clearAppBadge().catch(() => {}); }
+  if (!n) { box.innerHTML = '<div class="card vazio">Nada por aprovar ✓</div>'; return; }
+  box.innerHTML = '';
+  p.forEach(m => {
+    const c = document.createElement('div');
+    c.className = 'card pend' + (m.id === alvo ? ' hl' : '');
+    c.id = 'p-' + m.id;
+    box.appendChild(c);
+    formMov(c, m, (acoes, ler) => {
+      acoes.innerHTML = '<div class="row"><button class="btn neg">Rejeitar</button><button class="btn">Aprovar</button></div>';
+      const [bRej, bApr] = acoes.querySelectorAll('button');
+      bApr.onclick = async () => {
+        const mv = ler(); if (!mv) return;
+        bApr.disabled = true;
+        try { await api({ acao: 'aprovar', id: m.id, mov: mv }); toast('Aprovado'); retirar(m.id); aplicarLocal(mv); }
+        catch (e) { toast('Falhou: ' + e.message); bApr.disabled = false; }
+      };
+      bRej.onclick = async () => {
+        if (!confirm('Rejeitar este movimento?')) return;
+        try { await api({ acao: 'rejeitar', id: m.id }); toast('Rejeitado'); retirar(m.id); }
+        catch (e) { toast('Falhou: ' + e.message); }
+      };
+    }, m.sms ? `<div class="sms">${esc(m.sms)}</div>` : '');
+  });
+  if (alvo) { const el = document.getElementById('p-' + alvo); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+}
+function retirar(id) {
+  dados.pendentes = dados.pendentes.filter(x => x.id !== id);
+  ls.set('cache', dados); pintarPendentes();
+}
+
+/* ---------- saldos ---------- */
+function pintarSaldo() {
+  const s = dados.saldos || {};
+  const contas = [...new Set([...cfg.contas, ...Object.keys(s)])];
+  $('#total').textContent = fmt(Object.values(s).reduce((a, b) => a + b, 0)) + ' MZN';
+  $('#saldos').innerHTML = contas.map(c => `<div class="saldo"><span>${esc(c)}</span><b>${fmt(s[c] || 0)}</b></div>`).join('');
+  const r = dados.recentes || [];
+  $('#recentes').innerHTML = r.length ? r.slice(0, 40).map(m => `
+    <div class="mov"><div><div>${esc(m.descricao || m.categoria || (m.conta + ' → ' + m.conta_destino))}</div>
+    <div class="d">${esc(m.data)} · ${esc(m.tipo === 'transferencia' ? m.conta + ' → ' + m.conta_destino : m.conta + ' · ' + m.categoria)}</div></div>
+    <div class="v ${m.tipo}">${SINAL[m.tipo]} ${fmt(m.valor)}</div></div>`).join('') : '<div class="vazio">Sem movimentos ainda</div>';
+}
+
+/* ---------- carregar do servidor ---------- */
+async function carregar(aviso) {
+  if (!cfg.url) { if (aviso) toast('Configura o GAS em Definições'); return; }
+  try {
+    await enviarFila();
+    const j = await apiGet();
+    dados = { pendentes: j.pendentes || [], saldos: j.saldos || {}, recentes: j.recentes || [] };
+    fila.forEach(aplicarLocal); // registos ainda não enviados continuam visíveis
+    ls.set('cache', dados);
+    pintarPendentes(); pintarSaldo();
+    if (aviso) toast('Actualizado');
+  } catch (e) { if (aviso) toast('Sem ligação: ' + e.message); }
+}
+
+/* ---------- definições ---------- */
+function abrirDef() {
+  $('#d-url').value = cfg.url; $('#d-tok').value = cfg.token;
+  $('#d-contas').value = cfg.contas.join(', '); $('#d-cs').value = cfg.cs.join(', '); $('#d-ce').value = cfg.ce.join(', ');
+}
+const lista = v => v.split(',').map(s => s.trim()).filter(Boolean);
+function guardarDef() {
+  cfg = Object.assign(cfg, {
+    url: $('#d-url').value.trim(), token: $('#d-tok').value.trim(),
+    contas: lista($('#d-contas').value), cs: lista($('#d-cs').value), ce: lista($('#d-ce').value)
+  });
+  ls.set('cfg', cfg); montarRegisto(); toast('Guardado'); carregar();
+}
+async function testar() {
+  guardarDef();
+  try { await apiGet(); toast('Ligação OK ✓'); } catch (e) { toast('Falhou: ' + e.message); }
+}
+
+/* ---------- navegação ---------- */
+function ir(v) {
+  document.querySelectorAll('.view').forEach(x => x.classList.toggle('on', x.id === 'v-' + v));
+  document.querySelectorAll('nav button').forEach(x => x.classList.toggle('on', x.dataset.v === v));
+  if (v === 'def') abrirDef();
+  if (v === 'apr' || v === 'sal') carregar();
+  scrollTo(0, 0);
+}
+document.querySelectorAll('nav button').forEach(b => b.onclick = () => ir(b.dataset.v));
+
+function rede() {
+  const on = navigator.onLine;
+  $('#net').classList.toggle('off', !on); $('#net span').textContent = on ? 'online' : 'offline';
+  if (on) enviarFila();
+}
+addEventListener('online', rede); addEventListener('offline', rede);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) carregar(); });
+
+/* ---------- arranque ---------- */
+montarRegisto(); pintarPendentes(); pintarSaldo(); rede();
+if (!cfg.url) ir('def'); else if (alvo) ir('apr'); else carregar();
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+</script>
+</body>
+</html>
