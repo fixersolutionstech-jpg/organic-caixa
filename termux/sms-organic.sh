@@ -1,7 +1,7 @@
 #!/data/data/com.termux/files/usr/bin/bash
 # sms-organic.sh — lê SMS novos (+842424, STD Bank, M-Pesa, e-Mola), envia ao GAS e avisa para aprovar.
 # Requer no Termux: pkg install termux-api jq curl  (+ app Termux:API instalada, permissão de SMS)
-# Corre de 2 em 2 min: termux-job-scheduler --script ~/organic/sms-organic.sh --period-ms 120000 --persisted true
+# Corre de 15 em 15 min (mínimo do Android): termux-job-scheduler --script ~/organic/sms-organic.sh --period-ms 900000 --persisted true
 # Ao domingo, depois das 18h, também lembra a revisão semanal (uma vez por semana).
 
 DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -24,7 +24,8 @@ enviar() {
 }
 
 # do mais antigo para o mais novo, para o marcador nunca saltar SMS
-termux-sms-list -l 200 -t inbox | jq -c --arg d "$DESDE" 'reverse | .[] | select(.received >= $d)' | while read -r s; do
+# o ciclo lê do descritor 3: o termux-notification e o curl consumiam o stdin e cortavam o ciclo a meio (uma SMS por ronda)
+while read -r s <&3; do
   id=$(echo "$s" | jq -r '._id')
   [ "$id" -le "$ult" ] && continue
   rem=$(echo "$s" | jq -r '.number')
@@ -42,7 +43,7 @@ termux-sms-list -l 200 -t inbox | jq -c --arg d "$DESDE" 'reverse | .[] | select
     termux-notification --id "org$id" --title "Organic · erro ao enviar" --content "$rem: tenta de novo na próxima ronda"
     break   # não avança o marcador: volta a tentar
   fi
-done
+done 3< <(termux-sms-list -l 200 -t inbox | jq -c --arg d "$DESDE" 'reverse | .[] | select(.received >= $d)')
 
 # lembrete semanal: domingo depois das 18h, uma vez por semana
 if [ "$(date +%u)" = "7" ] && [ "$(date +%H)" -ge 18 ]; then
