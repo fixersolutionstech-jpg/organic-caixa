@@ -186,6 +186,7 @@ function lerSaldos_() {
  */
 function sms_(texto, remetente) {
   const sug = parseSMS_(texto, remetente);
+  if (sug.ignorar) return { ok: true, ignorado: true, id: sug.id, resumo: 'SMS ignorado: operação falhada' };
   sug.sms = texto;
   const taxa = sug.taxa; delete sug.taxa;
   const r = registar_(sug, 'sms', 'pendente');
@@ -248,7 +249,9 @@ function parseSMS_(texto, remetente) {
   const o = { id: cod ? String(cod).toLowerCase().replace(/\.$/, '') : hash_(t), data: dataSMS_(t), tipo: 'saida', valor: 0, conta,
     taxa: taxas_(t), categoria: 'Outros', descricao: '' };
   let m;
-  if (/credelec|val energia/i.test(t) && (m = t.match(/Total Pago:?\s*([\d.,]+)/i))) {
+  if (/^\s*falhou|n[aã]o tens saldo|nao tens saldo|transaction failed|opera[cç][aã]o falhou/i.test(t)) {
+    o.ignorar = true; // operação que não aconteceu: nada a registar
+  } else if (/credelec|val energia/i.test(t) && (m = t.match(/Total Pago:?\s*([\d.,]+)/i))) {
     o.valor = num_(m[1]); o.categoria = 'Casa'; o.descricao = 'Credelec (energia)'; o.taxa = 0;
   } else if (/voucher/i.test(t) && (m = t.match(/Debit amount\s*([\d.,]+)\s*MT/i))) {
     o.valor = num_(m[1]); o.categoria = 'Comunicação'; o.descricao = 'Recarga TMCEL';

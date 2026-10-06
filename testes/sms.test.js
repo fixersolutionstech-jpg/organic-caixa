@@ -26,6 +26,8 @@ const casos = [
     { tipo: 'saida', valor: 30, conta: 'e-Mola', categoria: 'Casa', data: '2026-08-12' }],
   ['e-Mola', 'ID da Transacao: CO260812.2030.L97079. Efectuou um pagamento de 1.00 MT para Movitel,SA. A 20:30 12/08/2026. O seu saldo actual e de 6.00 MT. Obrigado!',
     { tipo: 'saida', valor: 1, conta: 'e-Mola', categoria: 'Comunicação', data: '2026-08-12', id: 'co260812.2030.l97079' }],
+  ['MPESA', 'Falhou. Nao tens saldo suficiente na conta M-Pesa  para levantar 2,950.00MT  de XXX.O saldo M-Pesa e de 2,979.16MT. M-Pesa e facil!',
+    { ignorar: true }],
 ];
 
 let falhas = 0;

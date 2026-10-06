@@ -33,6 +33,7 @@ termux-sms-list -l 200 -t inbox | jq -c --arg d "$DESDE" 'reverse | .[] | select
 
   corpo=$(jq -n --arg t "$GAS_TOKEN" --arg x "$txt" --arg r "$rem" '{token:$t,acao:"sms",texto:$x,remetente:$r}')
   if enviar "$corpo"; then
+    if [ "$(echo "$resp" | jq -r '.ignorado')" = "true" ]; then echo "$id" > "$ULTIMO"; continue; fi   # ex.: "Falhou. Nao tens saldo"
     mid=$(echo "$resp" | jq -r '.id'); res=$(echo "$resp" | jq -r '.resumo')
     termux-notification --id "org$id" --title "Organic · por aprovar" --content "$res — toca para aprovar" \
       --action "termux-open-url '$PWA_URL?id=$mid'"

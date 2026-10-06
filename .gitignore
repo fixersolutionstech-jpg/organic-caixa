@@ -7,3 +7,5 @@ termux/config.sh
 .claude/settings.local.json
 gas/*.png
 Annotation*.png
+gas/*.jpg
+Screenshot*
