@@ -177,41 +177,108 @@ function lerSaldos_() {
 }
 
 /* ---------- SMS (Termux) ----------
- * Guarda o SMS como PENDENTE com uma sugestão de classificação.
- * O parser fica completo quando tivermos os SMS de exemplo.
+ * Guarda o SMS como PENDENTE com uma sugestão de classificação (o Rei aprova/corrige na PWA).
+ * O id vem do código da transacção (M-Pesa, e-Mola, Ref do Credelec) ou de um hash do texto:
+ * reenviar o mesmo SMS nunca duplica.
+ * Reconhece: M-Pesa (levantaste, depositaste, transferiste, recebeste, compra), e-Mola (pagamento),
+ * STD Bank (débito/crédito + comissão e imposto de selo), Credelec (STD, M-Pesa, e-Mola), TMCEL voucher.
+ * Levantamento/depósito = transferência Caixa<->M-Pesa (a taxa vai à parte).
  */
 function sms_(texto, remetente) {
   const sug = parseSMS_(texto, remetente);
   sug.sms = texto;
   const taxa = sug.taxa; delete sug.taxa;
   const r = registar_(sug, 'sms', 'pendente');
-  r.resumo = `${sug.valor || '?'} MZN · ${sug.conta} · ${sug.tipo === 'entrada' ? 'entrada' : 'saída'}`;
-  if (taxa > 0 && !r.duplicado) { // a taxa do M-Pesa vem no SMS: movimento próprio, para aprovar à parte
-    registar_({ data: sug.data, tipo: 'saida', valor: taxa, conta: sug.conta, categoria: 'Taxas',
-      descricao: 'Taxa ' + sug.conta, sms: texto }, 'sms', 'pendente');
+  r.resumo = `${sug.valor || '?'} MZN · ${sug.conta} · ${sug.tipo === 'entrada' ? 'entrada' : sug.tipo === 'transferencia' ? 'transferência' : 'saída'}`;
+  if (taxa > 0 && !r.duplicado) { // a taxa vem no SMS: movimento próprio, para aprovar à parte
+    const c = sug.tipo === 'transferencia' ? 'M-Pesa' : sug.conta;
+    registar_({ id: sug.id + '-tx', data: sug.data, tipo: 'saida', valor: taxa, conta: c, categoria: 'Taxas',
+      descricao: 'Taxa ' + c, sms: texto }, 'sms', 'pendente');
     r.taxa = taxa;
   }
   return r;
 }
 
+/** "1,530.00" (M-Pesa) e "10,00" (banco) -> número */
+function num_(s) {
+  s = String(s).replace(/\s/g, '');
+  const p = s.lastIndexOf('.'), v = s.lastIndexOf(',');
+  if (p >= 0 && v >= 0) {
+    const dec = p > v ? '.' : ',';
+    s = dec === '.' ? s.replace(/,/g, '') : s.replace(/\./g, '').replace(',', '.');
+  } else if (v >= 0) {
+    s = /,\d{2}$/.test(s) ? s.replace(',', '.') : s.replace(/,/g, '');
+  } else if (p >= 0 && /^\d{1,3}\.\d{3}$/.test(s)) {
+    s = s.replace('.', '');
+  }
+  return Number(s) || 0;
+}
+function iso_(d, m, a) {
+  a = Number(a); if (a < 100) a += 2000;
+  d = Number(d); m = Number(m);
+  if (m < 1 || m > 12 || d < 1 || d > 31) return '';
+  return a + '-' + ('0' + m).slice(-2) + '-' + ('0' + d).slice(-2);
+}
+function dataSMS_(t) {
+  let m = t.match(/\b(\d{1,2})\/(\d{1,2})\/(\d{2,4})\b/) || t.match(/\b(\d{1,2})-(\d{1,2})-(\d{4})\b/);
+  let d = m ? iso_(m[1], m[2], m[3]) : '';
+  if (!d) { m = t.match(/\bRef:?\s*(20\d{2})(\d{2})(\d{2})\d{6,}/i); d = m ? iso_(m[3], m[2], m[1]) : ''; }
+  return d || hoje_();
+}
+function hash_(t) {
+  let h = 5381;
+  for (let i = 0; i < t.length; i++) h = ((h << 5) + h + t.charCodeAt(i)) | 0;
+  return 'h' + (h >>> 0).toString(36);
+}
+/** soma de taxa/comissão/imposto de selo ("a taxa foi de 10.00MT", "Comissao: 0.00MT") */
+function taxas_(t) {
+  let s = 0, m;
+  const re = /(?:taxa|comiss[aã]o|imposto de selo)[^\d\n]{0,20}(\d[\d.,]*)\s*MT/gi;
+  while ((m = re.exec(t))) s += num_(m[1]);
+  return Math.round(s * 100) / 100;
+}
+
 function parseSMS_(texto, remetente) {
   const t = String(texto);
-  const rem = String(remetente).toUpperCase();
-  const conta = /MPESA|M-PESA/.test(rem + t.toUpperCase()) ? 'M-Pesa'
-    : /EMOLA|E-MOLA/.test(rem + t.toUpperCase()) ? 'e-Mola' : 'Banco';
-  const mv = t.match(/(\d{1,3}(?:[.,\s]\d{3})*(?:[.,]\d{2})?)\s*(?:MT|MZN)/i);
-  const valor = mv ? Number(mv[1].replace(/[\s.](?=\d{3})/g, '').replace(',', '.')) : 0;
-  const entrada = /recebeu|recebido|credit|depósito|deposito/i.test(t);
-  // taxa/comissão: "taxa foi de 3.00MT", "comissão: 3,00 MZN" (provisório até haver SMS reais)
-  const mt = t.match(/(?:taxa|comiss[aã]o|tarifa)[^\d]{0,20}(\d{1,3}(?:[.,\s]\d{3})*(?:[.,]\d{1,2})?)\s*(?:MT|MZN)/i);
-  const taxa = mt ? Number(mt[1].replace(/[\s.](?=\d{3})/g, '').replace(',', '.')) : 0;
-  return {
-    data: hoje_(), tipo: entrada ? 'entrada' : 'saida', valor, conta, taxa,
-    categoria: entrada ? 'Rendimento' : 'Outros', descricao: ''
-  };
+  const U = (String(remetente) + ' ' + t).toUpperCase();
+  const conta = /STD\s*BANK|STANDARD BANK|BCI|MILLENNIUM|ABSA|\bBIM\b/.test(U) ? 'Banco'
+    : /E-?MOLA|ID DA TRANSACAO/.test(U) ? 'e-Mola' : 'M-Pesa';
+  const cod = (t.match(/Confirmado\s+([A-Z0-9]{8,})/) || t.match(/ID da Transacao:\s*([A-Z0-9.]+)/i)
+    || t.match(/\bRef:?\s*(\d{12,})/i) || [])[1];
+  const o = { id: cod ? String(cod).toLowerCase().replace(/\.$/, '') : hash_(t), data: dataSMS_(t), tipo: 'saida', valor: 0, conta,
+    taxa: taxas_(t), categoria: 'Outros', descricao: '' };
+  let m;
+  if (/credelec|val energia/i.test(t) && (m = t.match(/Total Pago:?\s*([\d.,]+)/i))) {
+    o.valor = num_(m[1]); o.categoria = 'Casa'; o.descricao = 'Credelec (energia)'; o.taxa = 0;
+  } else if (/voucher/i.test(t) && (m = t.match(/Debit amount\s*([\d.,]+)\s*MT/i))) {
+    o.valor = num_(m[1]); o.categoria = 'Comunicação'; o.descricao = 'Recarga TMCEL';
+  } else if ((m = t.match(/levantaste\s+([\d.,]+)\s*MT/i))) {
+    o.valor = num_(m[1]); o.tipo = 'transferencia'; o.conta = 'M-Pesa'; o.conta_destino = 'Caixa'; o.categoria = ''; o.descricao = 'Levantamento M-Pesa';
+  } else if ((m = t.match(/depositaste[^\d]{0,30}([\d.,]+)\s*MT/i))) {
+    o.valor = num_(m[1]); o.tipo = 'transferencia'; o.conta = 'Caixa'; o.conta_destino = 'M-Pesa'; o.categoria = ''; o.descricao = 'Depósito M-Pesa';
+  } else if ((m = t.match(/transferiste\s+([\d.,]+)\s*MT/i))) {
+    o.valor = num_(m[1]); o.descricao = 'Transferência M-Pesa';
+  } else if ((m = t.match(/recebeste\s+([\d.,]+)\s*MT/i))) {
+    o.valor = num_(m[1]); o.tipo = 'entrada'; o.descricao = 'Recebido M-Pesa'; o.taxa = 0;
+  } else if ((m = t.match(/opera[cç][aã]o de compra no valor de\s+([\d.,]+)\s*MT/i))) {
+    o.valor = num_(m[1]);
+    const e = t.match(/na entidade\s+(.+?)\s+com referencia/i);
+    o.descricao = 'Compra: ' + (e ? e[1] : 'M-Pesa');
+  } else if ((m = t.match(/pagamento de\s+([\d.,]+)\s*MT\s+para\s+(.+?)\.\s*A\s/i))) {
+    o.valor = num_(m[1]); o.descricao = 'Pagamento ' + m[2];
+    if (/movitel|tmcel|vodacom/i.test(m[2])) o.categoria = 'Comunicação';
+  } else if ((m = t.match(/(d[eé]bito|cr[eé]dito)\s+de\s+([\d.,]+)\s*MT/i))) {
+    o.valor = num_(m[2]); o.tipo = /^c/i.test(m[1]) ? 'entrada' : 'saida'; o.descricao = 'Movimento bancário';
+  } else { // desconhecido: fica pendente para o Rei preencher
+    m = t.match(/(\d[\d.,]*)\s*(?:MT|MZN)/i);
+    o.valor = m ? num_(m[1]) : 0;
+    o.tipo = /recebeu|recebido|credit|dep[oó]sito/i.test(t) ? 'entrada' : 'saida';
+    o.descricao = 'SMS por classificar';
+  }
+  return o;
 }
 
 /* Teste rápido no editor: Executar → testeSMS */
 function testeSMS() {
-  Logger.log(JSON.stringify(parseSMS_('Confirmado XXX. Transferiste 1.500,00MT para 84XXXXXXX. A taxa foi de 15,00MT.', 'M-PESA')));
+  Logger.log(JSON.stringify(parseSMS_('Confirmado DJ00TEST00X. Transferiste 10.00MT e a taxa foi de 1.00MT para XXX aos 3/10/26 as 11:20 AM.', 'M-PESA')));
 }

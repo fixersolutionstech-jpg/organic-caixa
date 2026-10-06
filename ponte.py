@@ -16,6 +16,7 @@ import os
 import shutil
 import subprocess
 import sys
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -56,11 +57,19 @@ def env():
 
 
 def gas(cfg, corpo=None, **params):
-    if corpo is None:
-        r = requests.get(cfg["GAS_URL"], params={"token": cfg["GAS_TOKEN"], **params}, timeout=60)
-    else:
-        r = requests.post(cfg["GAS_URL"], data=json.dumps({"token": cfg["GAS_TOKEN"], **corpo}), timeout=60)
-    j = r.json()
+    """Chama o GAS. O Google devolve 404/HTML de vez em quando: repete até 4 vezes."""
+    for i in range(4):
+        try:
+            if corpo is None:
+                r = requests.get(cfg["GAS_URL"], params={"token": cfg["GAS_TOKEN"], **params}, timeout=60)
+            else:
+                r = requests.post(cfg["GAS_URL"], data=json.dumps({"token": cfg["GAS_TOKEN"], **corpo}), timeout=60)
+            j = r.json()
+            break
+        except ValueError:
+            if i == 3:
+                sys.exit("O GAS não devolveu JSON (HTTP %s). Tenta outra vez daqui a pouco." % r.status_code)
+            time.sleep(2)
     if not j.get("ok"):
         sys.exit("Erro do GAS: " + str(j.get("erro")))
     return j
