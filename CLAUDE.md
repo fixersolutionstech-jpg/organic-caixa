@@ -47,9 +47,11 @@ ponte.py também copia os saldos de `Contas` para a Sheet (a PWA só os mostra)
 - [x] `parseSMS_` afinado com SMS reais (M-Pesa, e-Mola, STD Bank, Credelec, TMCEL); ignora "Falhou…" e a compra EDM (o recibo do Credelec já regista a luz); testes em `testes/sms.test.js`
 - [x] Termux a ler SMS de +842424, STD, M-Pesa, e-Mola desde 2026-10-01 (`DESDE` em `config.sh`); lembrete de domingo às 18h no próprio script
 - [ ] Agendar no Termux: `termux-job-scheduler --script ~/organic/sms-organic.sh --period-ms 120000 --persisted true`; desligar optimização de bateria
-- [ ] Saldo inicial de 01-10 (Caixa+M-Pesa em CASH, Banco): M-Pesa era 41,16 MT às 00:00 de 01-10 (dos SMS); falta o dinheiro físico e o banco. Há 3.000 MT que entraram no M-Pesa entre 01-10 18:10 e 03-10 00:04 sem SMS
-- [ ] Trocar o token (é fraco) e apagar as capturas de ecrã da pasta `gas`
-- [ ] Instalar a PWA e aprovar os pendentes; depois `python ponte.py`
+- [x] Reestruturação 2026-10-06: CASH inicial 131 (41 M-Pesa + 90 físico), DIVIDAS -11 750 (detalhe em `Contabilidade\Passivos.md`); 21 movimentos 01–06/10 aprovados no Organic (CASH 500, dívidas -10 150); Sheet limpa; STD/caixa Fixer ficam fora do Organic
+- [x] (resolvido) Saldo inicial de 01-10 (Caixa+M-Pesa em CASH, Banco): M-Pesa era 41,16 MT às 00:00 de 01-10 (dos SMS); falta o dinheiro físico e o banco. Há 3.000 MT que entraram no M-Pesa entre 01-10 18:10 e 03-10 00:04 sem SMS
+- [x] Token trocado e capturas de ecrã apagadas
+- [x] PWA instalada; pendentes de 01–06/10 substituídos pelo lote da reestruturação
+- Cuidado: `ponte.py` trata qualquer argumento desconhecido (ex. `--help`) como importação
 - [ ] Futuro: conferir o saldo M-Pesa dos SMS com o do Organic na revisão semanal; atenção: o GAS responde "token inválido" de vez em quando (a ponte e o Termux repetem)
 
 ## Ao terminar uma sessão
