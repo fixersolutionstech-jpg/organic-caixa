@@ -172,7 +172,7 @@ function lerSaldos_() {
   const n = s.getLastRow();
   const saldos = {};
   let em = '';
-  if (n > 1) s.getRange(2, 1, n - 1, 3).getValues().forEach(r => { saldos[r[0]] = Number(r[1]) || 0; em = String(r[2]); });
+  if (n > 1) s.getRange(2, 1, n - 1, 3).getValues().forEach(r => { saldos[r[0]] = Number(r[1]) || 0; em = r[2] instanceof Date ? Utilities.formatDate(r[2], 'Africa/Maputo', "yyyy-MM-dd'T'HH:mm") : String(r[2]); });
   return { saldos, em };
 }
 
