@@ -35,7 +35,11 @@ organic.py sincronizar → Excel do Organic (Diario, Saldos, Mensal)
 - [x] organic.py sincronizar → Excel
 - [x] Script Termux (rascunho)
 - [ ] Afinar `parseSMS_` com SMS reais de exemplo (M-Pesa, e-Mola, banco)
-- [ ] Configurar clasp
+- [x] Repositório GitHub público + Pages: https://fixersolutionstech-jpg.github.io/organic-caixa/
+- [x] Configurar clasp (script ligado à Sheet; `clasp push` + `clasp deploy -i <id>` mantém o URL; `.clasp.json` fora do Git)
+- [x] `.env` preenchido; `organic.py` testado (Sheet vazia + movimentos fictícios, saldos correctos) com Excel temporário
+- [ ] Primeira `python organic.py sincronizar` para o `Diario.xlsx` real (só depois de registar o saldo inicial na PWA)
+- [ ] Instalar a PWA no telemóvel (Definições → URL + TOKEN → Testar ligação) e registar saldos iniciais
 - [ ] Lembrete semanal (termux-job-scheduler, domingo)
 - [ ] Escrever resumo em `C:\Users\Edson Adolfo\Desktop\AI\The castelo do Rei multiplicado\THE ORANIC\_Estado.md` após cada sincronização
 

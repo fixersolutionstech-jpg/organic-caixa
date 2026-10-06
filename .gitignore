@@ -5,3 +5,5 @@ termux/.ultimo_sms
 termux/config.sh
 .clasp.json
 .claude/settings.local.json
+gas/*.png
+Annotation*.png

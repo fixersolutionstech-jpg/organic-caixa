@@ -56,8 +56,15 @@ function obj_(r) {
 }
 
 /* ---------- entradas HTTP ---------- */
+/** Corre uma vez no editor para o Google pedir as permissões (Sheets) e criar a folha. */
+function autorizar() {
+  const s = sh_();
+  Logger.log('OK — folha "%s" pronta, %s linha(s). TOKEN definido: %s',
+    SHEET, s.getLastRow(), !!PropertiesService.getScriptProperties().getProperty('TOKEN'));
+}
+
 function doGet(e) {
-  const p = e.parameter || {};
+  const p = (e && e.parameter) || {};
   if (!auth_(p.token)) return out_({ ok: false, erro: 'token inválido' });
   if (p.acao === 'listar') return out_(listar_());
   if (p.acao === 'exportar') return out_(exportar_());
