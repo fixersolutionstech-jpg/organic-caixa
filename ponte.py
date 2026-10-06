@@ -65,6 +65,8 @@ def gas(cfg, corpo=None, **params):
             else:
                 r = requests.post(cfg["GAS_URL"], data=json.dumps({"token": cfg["GAS_TOKEN"], **corpo}), timeout=60)
             j = r.json()
+            if j.get("erro") == "token inválido" and i < 3:  # o GAS falha isto de vez em quando
+                raise ValueError("token")
             break
         except ValueError:
             if i == 3:

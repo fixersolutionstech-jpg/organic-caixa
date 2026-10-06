@@ -44,7 +44,9 @@ ponte.py também copia os saldos de `Contas` para a Sheet (a PWA só os mostra)
 - [x] Fase 3 (código): `ponte.py` testado com cópia do Organic e movimentos fictícios; `Code.gs` com acções `importado` e `saldos` e taxa M-Pesa como movimento à parte
 - [x] Fase 3 (deploy) 2026-10-06: GAS @4 no ar, Pages com `organic-v2`, saldos a zero enviados. Organic reiniciado a 2026-10-01 (histórico em `Contabilidade\Historico\`)
 - [ ] Testes ponta a ponta com movimentos reais de outubro (PWA → `ponte.py` → Pendentes → aprovar) e 1 movimento com backup
-- [ ] Afinar a taxa M-Pesa no `parseSMS_` com SMS reais (regex provisória)
+- [x] `parseSMS_` afinado com SMS reais (M-Pesa, e-Mola, STD Bank, Credelec, TMCEL); testes em `testes/sms.test.js`; GAS @5 no ar (2026-10-06)
+- [ ] Atenção: o GAS responde "token inválido" de vez em quando com o token certo; a `ponte.py` repete. O script do Termux tem de repetir também
+- [ ] Instalar Termux + Termux:API e agendar `termux/sms-organic.sh`; lembrete semanal (domingo) para a revisão
 - [x] Fase 4 (código): PWA mostra saldos do Organic (folha Saldos da Sheet) e movimentos por importar
 - [ ] Instalar a PWA no telemóvel (Definições → URL + TOKEN → Testar ligação)
 - [ ] Lembrete semanal (termux-job-scheduler, domingo)
