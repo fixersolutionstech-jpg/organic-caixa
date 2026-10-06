@@ -1,5 +1,5 @@
 // Cache da "casca" da app para abrir offline. Os dados vão sempre à rede.
-const C = 'organic-v1';
+const C = 'organic-v2';
 const ASSETS = ['./', 'index.html', 'manifest.json', 'icon-192.png', 'icon-512.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(C).then(c => c.addAll(ASSETS))); self.skipWaiting(); });
 self.addEventListener('activate', e => {

@@ -95,6 +95,7 @@ nav button.on{color:var(--ac)}
     <label class="l" style="margin-top:0">Total</label>
     <div class="total" id="total">—</div>
     <div id="saldos" style="margin-top:10px"></div>
+    <p class="hint" id="saldo-nota"></p>
   </div>
   <div class="card">
     <label class="l" style="margin-top:0">Recentes</label>
@@ -118,7 +119,7 @@ nav button.on{color:var(--ac)}
     <input class="t" id="d-ce">
     <button class="btn" onclick="guardarDef()">Guardar</button>
     <button class="btn sec" onclick="testar()">Testar ligação</button>
-    <p class="hint">Saldo inicial de cada conta: regista uma entrada com a categoria "Saldo inicial".</p>
+    <p class="hint">Os saldos vêm do Organic (folha Contas), actualizados quando corres a ponte no PC. Não registes saldos iniciais aqui.</p>
   </div>
 </section>
 
@@ -136,8 +137,8 @@ nav button.on{color:var(--ac)}
 const DEF = {
   url: '', token: '',
   contas: ['Caixa', 'M-Pesa', 'e-Mola', 'Banco'],
-  cs: ['Alimentação', 'Transporte', 'Casa', 'Comunicação', 'Saúde', 'Pessoal', 'Lazer', 'Aporte Fixer', 'Outros'],
-  ce: ['Rendimento', 'Salário', 'Reembolso Fixer', 'Saldo inicial', 'Outros']
+  cs: ['Alimentação', 'Transporte', 'Casa', 'Comunicação', 'Saúde', 'Educação', 'Dízimo', 'Família', 'Software', 'Equipamento', 'Pessoal', 'Lazer', 'Taxas', 'Aporte Fixer', 'Outros'],
+  ce: ['Rendimento', 'Salário', 'Reembolso Fixer', 'Outros']
 };
 const ls = {
   get(k, d) { try { const v = localStorage.getItem('org_' + k); return v ? JSON.parse(v) : d; } catch (e) { return d; } },
@@ -304,6 +305,9 @@ function pintarSaldo() {
   const s = dados.saldos || {};
   const contas = [...new Set([...cfg.contas, ...Object.keys(s)])];
   $('#total').textContent = fmt(Object.values(s).reduce((a, b) => a + b, 0)) + ' MZN';
+  const em = (dados.saldos_em || '').replace('T', ' ').slice(0, 16);
+  $('#saldo-nota').textContent = (em ? `Saldos do Organic em ${em}.` : 'Ainda sem saldos do Organic (corre a ponte no PC).')
+    + (dados.por_importar ? ` ${dados.por_importar} movimento(s) aprovado(s) ainda por passar ao Organic.` : '');
   $('#saldos').innerHTML = contas.map(c => `<div class="saldo"><span>${esc(c)}</span><b>${fmt(s[c] || 0)}</b></div>`).join('');
   const r = dados.recentes || [];
   $('#recentes').innerHTML = r.length ? r.slice(0, 40).map(m => `
@@ -318,7 +322,7 @@ async function carregar(aviso) {
   try {
     await enviarFila();
     const j = await apiGet();
-    dados = { pendentes: j.pendentes || [], saldos: j.saldos || {}, recentes: j.recentes || [] };
+    dados = { pendentes: j.pendentes || [], saldos: j.saldos || {}, saldos_em: j.saldos_em || '', por_importar: j.por_importar || 0, recentes: j.recentes || [] };
     fila.forEach(aplicarLocal); // registos ainda não enviados continuam visíveis
     ls.set('cache', dados);
     pintarPendentes(); pintarSaldo();

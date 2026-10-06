@@ -13,6 +13,7 @@
  */
 
 const SHEET = 'Movimentos';
+const SALDOS = 'Saldos'; // saldos do Organic (Contas), copiados pela ponte.py — a PWA só os mostra
 const HEAD = ['id', 'data', 'tipo', 'valor', 'conta', 'conta_destino', 'categoria',
   'descricao', 'origem', 'estado', 'sms', 'criado_em', 'actualizado_em'];
 const COL = Object.fromEntries(HEAD.map((h, i) => [h, i]));
@@ -83,6 +84,8 @@ function doPost(e) {
       case 'aprovar':  return out_(actualizar_(b.id, b.mov || {}, 'aprovado'));
       case 'rejeitar': return out_(actualizar_(b.id, {}, 'rejeitado'));
       case 'sms':      return out_(sms_(b.texto || '', b.remetente || ''));
+      case 'importado': return out_(importado_(b.ids || []));
+      case 'saldos':   return out_(guardarSaldos_(b.saldos || {}));
       default:         return out_({ ok: false, erro: 'acção desconhecida' });
     }
   } finally {
@@ -122,24 +125,55 @@ function listar_() {
   const n = s.getLastRow();
   const rows = n > 1 ? s.getRange(2, 1, n - 1, HEAD.length).getValues().map(obj_) : [];
   const pendentes = rows.filter(r => r.estado === 'pendente');
-  const aprov = rows.filter(r => r.estado === 'aprovado');
-  const saldos = {};
-  const soma = (c, v) => { if (c) saldos[c] = (saldos[c] || 0) + v; };
-  aprov.forEach(r => {
-    if (r.tipo === 'entrada') soma(r.conta, r.valor);
-    else if (r.tipo === 'saida') soma(r.conta, -r.valor);
-    else if (r.tipo === 'transferencia') { soma(r.conta, -r.valor); soma(r.conta_destino, r.valor); }
-  });
-  const recentes = aprov.slice().sort((a, b) => (b.data + b.criado_em).localeCompare(a.data + a.criado_em)).slice(0, 40);
-  return { ok: true, pendentes, saldos, recentes };
+  const feitos = rows.filter(r => r.estado === 'aprovado' || r.estado === 'importado');
+  const recentes = feitos.slice().sort((a, b) => (b.data + b.criado_em).localeCompare(a.data + a.criado_em)).slice(0, 40);
+  const sd = lerSaldos_();
+  return { ok: true, pendentes, saldos: sd.saldos, saldos_em: sd.em, por_importar: rows.filter(r => r.estado === 'aprovado').length, recentes };
 }
 
-/* Todos os aprovados — usado pelo organic.py para gerar o Excel */
+/* Aprovados na PWA ainda não passados ao Organic — usado pela ponte.py */
 function exportar_() {
   const s = sh_();
   const n = s.getLastRow();
   const rows = n > 1 ? s.getRange(2, 1, n - 1, HEAD.length).getValues().map(obj_) : [];
   return { ok: true, movimentos: rows.filter(r => r.estado === 'aprovado') };
+}
+
+/* A ponte marca como 'importado' o que já foi proposto ao Organic (folha Pendentes) */
+function importado_(ids) {
+  let n = 0;
+  ids.forEach(id => {
+    const r = linha_(id);
+    if (!r) return;
+    const s = sh_();
+    s.getRange(r, COL.estado + 1).setValue('importado');
+    s.getRange(r, COL.actualizado_em + 1).setValue(agora_());
+    n++;
+  });
+  return { ok: true, marcados: n };
+}
+
+function saldosSh_() {
+  const ss = SpreadsheetApp.getActive();
+  let s = ss.getSheetByName(SALDOS);
+  if (!s) { s = ss.insertSheet(SALDOS); s.appendRow(['conta', 'saldo', 'actualizado_em']); s.setFrozenRows(1); }
+  return s;
+}
+function guardarSaldos_(saldos) {
+  const s = saldosSh_();
+  if (s.getLastRow() > 1) s.getRange(2, 1, s.getLastRow() - 1, 3).clearContent();
+  const t = agora_();
+  const linhas = Object.keys(saldos).map(c => [c, Number(saldos[c]) || 0, t]);
+  if (linhas.length) s.getRange(2, 1, linhas.length, 3).setValues(linhas);
+  return { ok: true, contas: linhas.length };
+}
+function lerSaldos_() {
+  const s = saldosSh_();
+  const n = s.getLastRow();
+  const saldos = {};
+  let em = '';
+  if (n > 1) s.getRange(2, 1, n - 1, 3).getValues().forEach(r => { saldos[r[0]] = Number(r[1]) || 0; em = String(r[2]); });
+  return { saldos, em };
 }
 
 /* ---------- SMS (Termux) ----------
@@ -149,8 +183,14 @@ function exportar_() {
 function sms_(texto, remetente) {
   const sug = parseSMS_(texto, remetente);
   sug.sms = texto;
+  const taxa = sug.taxa; delete sug.taxa;
   const r = registar_(sug, 'sms', 'pendente');
   r.resumo = `${sug.valor || '?'} MZN · ${sug.conta} · ${sug.tipo === 'entrada' ? 'entrada' : 'saída'}`;
+  if (taxa > 0 && !r.duplicado) { // a taxa do M-Pesa vem no SMS: movimento próprio, para aprovar à parte
+    registar_({ data: sug.data, tipo: 'saida', valor: taxa, conta: sug.conta, categoria: 'Taxas',
+      descricao: 'Taxa ' + sug.conta, sms: texto }, 'sms', 'pendente');
+    r.taxa = taxa;
+  }
   return r;
 }
 
@@ -162,13 +202,16 @@ function parseSMS_(texto, remetente) {
   const mv = t.match(/(\d{1,3}(?:[.,\s]\d{3})*(?:[.,]\d{2})?)\s*(?:MT|MZN)/i);
   const valor = mv ? Number(mv[1].replace(/[\s.](?=\d{3})/g, '').replace(',', '.')) : 0;
   const entrada = /recebeu|recebido|credit|depósito|deposito/i.test(t);
+  // taxa/comissão: "taxa foi de 3.00MT", "comissão: 3,00 MZN" (provisório até haver SMS reais)
+  const mt = t.match(/(?:taxa|comiss[aã]o|tarifa)[^\d]{0,20}(\d{1,3}(?:[.,\s]\d{3})*(?:[.,]\d{1,2})?)\s*(?:MT|MZN)/i);
+  const taxa = mt ? Number(mt[1].replace(/[\s.](?=\d{3})/g, '').replace(',', '.')) : 0;
   return {
-    data: hoje_(), tipo: entrada ? 'entrada' : 'saida', valor, conta,
+    data: hoje_(), tipo: entrada ? 'entrada' : 'saida', valor, conta, taxa,
     categoria: entrada ? 'Rendimento' : 'Outros', descricao: ''
   };
 }
 
 /* Teste rápido no editor: Executar → testeSMS */
 function testeSMS() {
-  Logger.log(JSON.stringify(parseSMS_('Confirmado. Transferiste 1.500,00MT para 84XXXXXXX', 'M-PESA')));
+  Logger.log(JSON.stringify(parseSMS_('Confirmado XXX. Transferiste 1.500,00MT para 84XXXXXXX. A taxa foi de 15,00MT.', 'M-PESA')));
 }

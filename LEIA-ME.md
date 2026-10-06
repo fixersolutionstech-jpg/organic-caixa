@@ -16,12 +16,13 @@
 1. Repositório `organic-caixa` → envia esta pasta (o `.gitignore` protege `.env` e `config.sh`).
 2. Settings → Pages → branch `main` / root.
 3. Abre o link no Chrome do telemóvel → **Instalar app** → Definições → URL + TOKEN → **Testar ligação**.
-4. Regista o saldo inicial de cada conta: Entrada · "Saldo inicial".
+4. **Não registes saldos iniciais**: já estão na folha `Contas` do Organic. A PWA mostra os saldos que a ponte copiar de lá.
 
-## 3. Excel no Organic (PC)
-1. Copia `.env.example` para `.env` e preenche.
-2. `pip install openpyxl requests`
-3. `python organic.py sincronizar` → gera `Diario.xlsx` (folhas Diario, Saldos, Mensal).
+## 3. Ponte para o Organic (PC) — em construção
+1. Copia `.env.example` para `.env` e preenche (GAS_URL, GAS_TOKEN, ORGANIC_DIR).
+2. `pip install requests`
+3. `python ponte.py` lê os movimentos aprovados na PWA, gera um lote JSON e chama `scripts/organic.py propor` do Organic. Os movimentos ficam em `Pendentes`; o Rei aprova no Organic (segunda aprovação).
+4. A ponte **nunca escreve no Excel**. Só o `organic.py` do Organic escreve em `Contabilidade.xlsx`.
 
 ## 4. Termux (telemóvel) — depois de afinar o parser
 1. Instala Termux + Termux:API (F-Droid) → `pkg install termux-api jq curl` → `termux-setup-storage`.
