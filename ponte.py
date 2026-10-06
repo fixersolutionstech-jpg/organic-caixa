@@ -5,10 +5,11 @@ Uso:
   python ponte.py                 importa: Sheet -> lote JSON -> organic.py propor (folha Pendentes)
   python ponte.py --seco          mostra o lote que seria criado; não escreve nada
   python ponte.py --saldos        só copia os saldos de Contas para a Sheet (a PWA mostra-os)
+  python ponte.py --revisao       revisão semanal: últimos 7 dias do Diario, pendentes, saldos; actualiza _Estado.md
   python ponte.py --de ficheiro   usa movimentos de um JSON local (testes); não toca na Sheet
 
 Requer: pip install requests openpyxl
-Lê GAS_URL, GAS_TOKEN e ORGANIC_DIR do .env desta pasta (ORGANIC_DIR pode ser também variável de ambiente).
+Lê GAS_URL e GAS_TOKEN do .env desta pasta. ORGANIC_DIR vem do .env ou do ambiente; se faltar, usa a pasta THE ORANIC do Rei.
 O registo oficial é Contabilidade.xlsx: só scripts/organic.py do Organic escreve nele (fecha o Excel antes).
 """
 import json
@@ -24,6 +25,7 @@ import requests
 from openpyxl import load_workbook
 
 AQUI = Path(__file__).parent
+ORGANIC_POR_DEFEITO = r"C:\Users\Edson Adolfo\Desktop\AI\The castelo do Rei multiplicado\THE ORANIC"
 
 # Contas da PWA -> contas do Organic (Caixa e M-Pesa estão unidos em CASH)
 CONTAS = {"Caixa": "CASH", "M-Pesa": "CASH", "e-Mola": "EMOLA", "Banco": "BANCO"}
@@ -121,7 +123,7 @@ def para_lote(m):
 
 
 def caminhos(cfg):
-    base = Path(cfg.get("ORGANIC_DIR", ""))
+    base = Path(cfg.get("ORGANIC_DIR") or ORGANIC_POR_DEFEITO)
     xlsx = base / "01_OPERACIONAL" / "Contabilidade" / "Contabilidade.xlsx"
     script = base / "scripts" / "organic.py"
     if not xlsx.exists() or not script.exists():
@@ -149,11 +151,48 @@ def saldos(xlsx):
     return {k: round(v, 2) for k, v in s.items()}
 
 
+def revisao(cfg, xlsx, script):
+    """Resumo dos últimos 7 dias (só leitura do Diario) + pendentes + saldos."""
+    from collections import defaultdict
+    from datetime import date, timedelta
+    wb = load_workbook(xlsx, read_only=True, data_only=True)
+    rows = list(wb["Diario"].iter_rows(values_only=True))
+    h = [str(x or "").strip().lower() for x in rows[0]]
+    i_d, i_e, i_s, i_c = h.index("data"), h.index("entrada (mzn)"), h.index("saída (mzn)"), h.index("categoria")
+    pend = sum(1 for r in wb["Pendentes"].iter_rows(min_row=2, values_only=True) if any(v not in (None, "") for v in r[1:]))
+    wb.close()
+    desde = date.today() - timedelta(days=6)
+    ent, sai = defaultdict(float), defaultdict(float)
+    for r in rows[1:]:
+        d = r[i_d]
+        if not d or not hasattr(d, "date") or d.date() < desde:
+            continue
+        cat = str(r[i_c] or "?")
+        if cat.startswith("R-"):
+            ent[cat] += float(r[i_e] or 0)
+        elif cat.startswith("D-"):
+            sai[cat] += float(r[i_s] or 0)
+    print(f"Revisão {desde:%d-%m} a {date.today():%d-%m}")
+    print(f"  Receitas {sum(ent.values()):,.2f}  ·  Despesas {sum(sai.values()):,.2f}  ·  Resultado {sum(ent.values()) - sum(sai.values()):,.2f} MZN")
+    for cat, v in sorted(sai.items(), key=lambda x: -x[1]):
+        print(f"    {cat:<10}{v:>12,.2f}")
+    print(f"  Pendentes no Organic: {pend}")
+    try:
+        j = gas(cfg, acao="listar")
+        print(f"  Na PWA: {len(j['pendentes'])} por aprovar, {j['por_importar']} aprovados por passar ao Organic")
+    except SystemExit as e:
+        print("  PWA indisponível:", e)
+    print("  Saldos:", ", ".join(f"{k} {v:,.2f}" for k, v in saldos(xlsx).items() if v) or "tudo a zero")
+    subprocess.run([sys.executable, str(script), "estado"], cwd=str(script.parent.parent))
+
+
 def main(a):
     cfg = env()
     seco, so_saldos = "--seco" in a, "--saldos" in a
     de = a[a.index("--de") + 1] if "--de" in a else None
     base, xlsx, script = caminhos(cfg)
+    if "--revisao" in a:
+        return revisao(cfg, xlsx, script)
 
     if not so_saldos:
         if de:

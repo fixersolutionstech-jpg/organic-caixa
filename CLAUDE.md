@@ -42,15 +42,15 @@ ponte.py também copia os saldos de `Contas` para a Sheet (a PWA só os mostra)
 - [ ] NÃO registar saldos iniciais na PWA (já estão em `Contas`)
 - [x] Fase 2: mapeamento aprovado (Caixa e M-Pesa → CASH; e-Mola → EMOLA; Banco → BANCO; categorias em `ponte.py`)
 - [x] Fase 3 (código): `ponte.py` testado com cópia do Organic e movimentos fictícios; `Code.gs` com acções `importado` e `saldos` e taxa M-Pesa como movimento à parte
-- [x] Fase 3 (deploy) 2026-10-06: GAS @4 no ar, Pages com `organic-v2`, saldos a zero enviados. Organic reiniciado a 2026-10-01 (histórico em `Contabilidade\Historico\`)
-- [ ] Testes ponta a ponta com movimentos reais de outubro (PWA → `ponte.py` → Pendentes → aprovar) e 1 movimento com backup
-- [x] `parseSMS_` afinado com SMS reais (M-Pesa, e-Mola, STD Bank, Credelec, TMCEL); testes em `testes/sms.test.js`; GAS @5 no ar (2026-10-06)
-- [ ] Atenção: o GAS responde "token inválido" de vez em quando com o token certo; a `ponte.py` repete. O script do Termux tem de repetir também
-- [ ] Instalar Termux + Termux:API e agendar `termux/sms-organic.sh`; lembrete semanal (domingo) para a revisão
-- [x] Fase 4 (código): PWA mostra saldos do Organic (folha Saldos da Sheet) e movimentos por importar
-- [ ] Instalar a PWA no telemóvel (Definições → URL + TOKEN → Testar ligação)
-- [ ] Lembrete semanal (termux-job-scheduler, domingo)
-- [ ] Escrever resumo em `C:\Users\Edson Adolfo\Desktop\AI\The castelo do Rei multiplicado\THE ORANIC\_Estado.md` após cada `ponte.py`
+- [x] Fase 3 (deploy) 2026-10-06: GAS @7, Pages com `organic-v2`; Organic reiniciado a 2026-10-01 (histórico em `Contabilidade\Historico\`)
+- [x] `ponte.py` (sem `.env` para o Organic: usa a pasta THE ORANIC por defeito) com `--seco`, `--saldos`, `--revisao`; teste ponta a ponta feito com 1 movimento
+- [x] `parseSMS_` afinado com SMS reais (M-Pesa, e-Mola, STD Bank, Credelec, TMCEL); ignora "Falhou…" e a compra EDM (o recibo do Credelec já regista a luz); testes em `testes/sms.test.js`
+- [x] Termux a ler SMS de +842424, STD, M-Pesa, e-Mola desde 2026-10-01 (`DESDE` em `config.sh`); lembrete de domingo às 18h no próprio script
+- [ ] Agendar no Termux: `termux-job-scheduler --script ~/organic/sms-organic.sh --period-ms 120000 --persisted true`; desligar optimização de bateria
+- [ ] Saldo inicial de 01-10 (Caixa+M-Pesa em CASH, Banco): M-Pesa era 41,16 MT às 00:00 de 01-10 (dos SMS); falta o dinheiro físico e o banco. Há 3.000 MT que entraram no M-Pesa entre 01-10 18:10 e 03-10 00:04 sem SMS
+- [ ] Trocar o token (é fraco) e apagar as capturas de ecrã da pasta `gas`
+- [ ] Instalar a PWA e aprovar os pendentes; depois `python ponte.py`
+- [ ] Futuro: conferir o saldo M-Pesa dos SMS com o do Organic na revisão semanal; atenção: o GAS responde "token inválido" de vez em quando (a ponte e o Termux repetem)
 
 ## Ao terminar uma sessão
 Actualiza a secção "Estado" acima e o ficheiro `THE ORANIC\01_OPERACIONAL\Sistema-Caixa.md` se algo mudou para o utilizador.

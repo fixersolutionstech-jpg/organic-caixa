@@ -186,7 +186,7 @@ function lerSaldos_() {
  */
 function sms_(texto, remetente) {
   const sug = parseSMS_(texto, remetente);
-  if (sug.ignorar) return { ok: true, ignorado: true, id: sug.id, resumo: 'SMS ignorado: operação falhada' };
+  if (sug.ignorar) return { ok: true, ignorado: true, id: sug.id, resumo: 'SMS ignorado (falhada ou duplicada)' };
   sug.sms = texto;
   const taxa = sug.taxa; delete sug.taxa;
   const r = registar_(sug, 'sms', 'pendente');
@@ -267,6 +267,7 @@ function parseSMS_(texto, remetente) {
     o.valor = num_(m[1]);
     const e = t.match(/na entidade\s+(.+?)\s+com referencia/i);
     o.descricao = 'Compra: ' + (e ? e[1] : 'M-Pesa');
+    if (e && /\bEDM\b|electricidade/i.test(e[1])) o.ignorar = true; // o recibo do Credelec já regista este pagamento
   } else if ((m = t.match(/pagamento de\s+([\d.,]+)\s*MT\s+para\s+(.+?)\.\s*A\s/i))) {
     o.valor = num_(m[1]); o.descricao = 'Pagamento ' + m[2];
     if (/movitel|tmcel|vodacom/i.test(m[2])) o.categoria = 'Comunicação';

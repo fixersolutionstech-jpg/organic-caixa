@@ -28,6 +28,8 @@ const casos = [
     { tipo: 'saida', valor: 1, conta: 'e-Mola', categoria: 'Comunicação', data: '2026-08-12', id: 'co260812.2030.l97079' }],
   ['MPESA', 'Falhou. Nao tens saldo suficiente na conta M-Pesa  para levantar 2,950.00MT  de XXX.O saldo M-Pesa e de 2,979.16MT. M-Pesa e facil!',
     { ignorar: true }],
+  ['MPESA', 'Confirmado DJ00TEST06F. Registamos uma operacao de compra no valor de 80.00MT e a taxa foi de 0.00MT na entidade EDM com referencia XXX aos 1/10/26 as 6:09 PM. O teu novo saldo M-Pesa e de 12.16MT.',
+    { ignorar: true }],
 ];
 
 let falhas = 0;
