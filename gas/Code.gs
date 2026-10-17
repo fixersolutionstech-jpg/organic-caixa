@@ -69,6 +69,7 @@ function doGet(e) {
   if (!auth_(p.token)) return out_({ ok: false, erro: 'token inválido' });
   if (p.acao === 'listar') return out_(listar_());
   if (p.acao === 'exportar') return out_(exportar_());
+  if (p.acao === 'todos') return out_(todos_());
   return out_({ ok: true, servico: 'organic' });
 }
 
@@ -116,6 +117,8 @@ function actualizar_(id, m, estado) {
   });
   row[COL.estado] = estado;
   row[COL.actualizado_em] = agora_();
+  row[COL.data] = dataTxt_(row[COL.data]);
+  s.getRange(r, 1, 1, 2).setNumberFormat('@'); // sem isto o Sheets converte a data em Date e ela anda um dia para trás
   s.getRange(r, 1, 1, HEAD.length).setValues([row]);
   return { ok: true, id };
 }
@@ -137,6 +140,14 @@ function exportar_() {
   const n = s.getLastRow();
   const rows = n > 1 ? s.getRange(2, 1, n - 1, HEAD.length).getValues().map(obj_) : [];
   return { ok: true, movimentos: rows.filter(r => r.estado === 'aprovado') };
+}
+
+/* Todos os movimentos não rejeitados — usado pela conferência do saldo M-Pesa (ponte.py --conferir) */
+function todos_() {
+  const s = sh_();
+  const n = s.getLastRow();
+  const rows = n > 1 ? s.getRange(2, 1, n - 1, HEAD.length).getValues().map(obj_) : [];
+  return { ok: true, movimentos: rows.filter(r => r.estado !== 'rejeitado') };
 }
 
 /* A ponte marca como 'importado' o que já foi proposto ao Organic (folha Pendentes) */
@@ -181,7 +192,9 @@ function lerSaldos_() {
  * O id vem do código da transacção (M-Pesa, e-Mola, Ref do Credelec) ou de um hash do texto:
  * reenviar o mesmo SMS nunca duplica.
  * Reconhece: M-Pesa (levantaste, depositaste, transferiste, recebeste, compra), e-Mola (pagamento),
- * STD Bank (débito/crédito + comissão e imposto de selo), Credelec (STD, M-Pesa, e-Mola), TMCEL voucher.
+ * STD Bank (débito/crédito + comissão e imposto de selo), Millennium BIM (débito, crédito, comissão anual,
+ * código de levantamento IZI = transferência Banco->Caixa; o débito seguinte só acrescenta a comissão),
+ * Credelec (STD, M-Pesa, e-Mola), TMCEL voucher.
  * Levantamento/depósito = transferência Caixa<->M-Pesa (a taxa vai à parte).
  */
 function sms_(texto, remetente) {
@@ -189,6 +202,14 @@ function sms_(texto, remetente) {
   if (sug.ignorar) return { ok: true, ignorado: true, id: sug.id, resumo: 'SMS ignorado (falhada ou duplicada)' };
   sug.sms = texto;
   const taxa = sug.taxa; delete sug.taxa;
+  const izi = sug.descricao === 'Débito BIM' ? iziPendente_(sug) : null;
+  if (izi) { // o débito confirma um levantamento IZI já registado: só falta a comissão
+    if (taxa > 0 && !linha_(sug.id + '-tx')) {
+      registar_({ id: sug.id + '-tx', data: sug.data, tipo: 'saida', valor: taxa, conta: 'Banco', categoria: 'Taxas',
+        descricao: 'Comissão levantamento IZI', sms: texto }, 'sms', 'pendente');
+    }
+    return { ok: true, id: izi, resumo: `Débito BIM ${sug.valor} MZN confirma o levantamento IZI` + (taxa > 0 ? ` (comissão ${taxa})` : '') };
+  }
   const r = registar_(sug, 'sms', 'pendente');
   r.resumo = `${sug.valor || '?'} MZN · ${sug.conta} · ${sug.tipo === 'entrada' ? 'entrada' : sug.tipo === 'transferencia' ? 'transferência' : 'saída'}`;
   if (taxa > 0 && !r.duplicado) { // a taxa vem no SMS: movimento próprio, para aprovar à parte
@@ -198,6 +219,18 @@ function sms_(texto, remetente) {
     r.taxa = taxa;
   }
   return r;
+}
+
+/** Procura um levantamento IZI (mesmo valor, não rejeitado, até 1 dia de distância) que o débito BIM vem confirmar */
+function iziPendente_(sug) {
+  const s = sh_();
+  const n = s.getLastRow();
+  if (n < 2) return null;
+  const rows = s.getRange(2, 1, n - 1, HEAD.length).getValues().map(obj_);
+  const d0 = new Date(sug.data + 'T00:00:00Z').getTime();
+  const r = rows.find(x => x.estado !== 'rejeitado' && /IZI/.test(x.sms || '') && x.valor === sug.valor &&
+    Math.abs(new Date(x.data + 'T00:00:00Z').getTime() - d0) <= 86400000);
+  return r ? r.id : null;
 }
 
 /** "1,530.00" (M-Pesa) e "10,00" (banco) -> número */
@@ -234,7 +267,7 @@ function hash_(t) {
 /** soma de taxa/comissão/imposto de selo ("a taxa foi de 10.00MT", "Comissao: 0.00MT") */
 function taxas_(t) {
   let s = 0, m;
-  const re = /(?:taxa|comiss[aã]o|imposto de selo)[^\d\n]{0,20}(\d[\d.,]*)\s*MT/gi;
+  const re = /(?:taxa|comiss[aã]o|imposto de selo)[^\d\n]{0,20}(\d[\d.,]*)\s*(?:MT|MZN)/gi;
   while ((m = re.exec(t))) s += num_(m[1]);
   return Math.round(s * 100) / 100;
 }
@@ -271,6 +304,18 @@ function parseSMS_(texto, remetente) {
   } else if ((m = t.match(/pagamento de\s+([\d.,]+)\s*MT\s+para\s+(.+?)\.\s*A\s/i))) {
     o.valor = num_(m[1]); o.descricao = 'Pagamento ' + m[2];
     if (/movitel|tmcel|vodacom/i.test(m[2])) o.categoria = 'Comunicação';
+  } else if ((m = t.match(/levantamento\s+IZI[\s\S]*?montante\s+([\d.,]+)/i))) {
+    // código de levantamento no ATM (Millennium): Banco -> numerário. O débito chega noutro SMS (ver sms_)
+    const c = t.match(/c[oó]digo de levantamento\s+(\d+)/i);
+    if (c) o.id = 'izi' + c[1];
+    o.valor = num_(m[1]); o.tipo = 'transferencia'; o.conta = 'Banco'; o.conta_destino = 'Caixa'; o.categoria = '';
+    o.descricao = 'Levantamento IZI ATM (BIM)'; o.taxa = 0;
+  } else if ((m = t.match(/foi debitada\s+([\d.,]+)\s*MZN\s+referente a\s+(comiss[aã]o[^.]*)/i))) {
+    o.valor = num_(m[1]); o.categoria = 'Taxas'; o.conta = 'Banco'; o.descricao = 'BIM: ' + m[2].trim(); o.taxa = 0;
+  } else if ((m = t.match(/foi debitada(?:\s+no valor de)?\s+([\d.,]+)\s*MZN/i))) {
+    o.valor = num_(m[1]); o.conta = 'Banco'; o.descricao = 'Débito BIM'; // a comissão (se houver) vem em taxas_
+  } else if ((m = t.match(/recebeu o valor de\s+([\d.,]+)\s*MZN/i))) {
+    o.valor = num_(m[1]); o.tipo = 'entrada'; o.conta = 'Banco'; o.descricao = 'Recebido BIM'; o.taxa = 0;
   } else if ((m = t.match(/(d[eé]bito|cr[eé]dito)\s+de\s+([\d.,]+)\s*MT/i))) {
     o.valor = num_(m[2]); o.tipo = /^c/i.test(m[1]) ? 'entrada' : 'saida'; o.descricao = 'Movimento bancário';
   } else { // desconhecido: fica pendente para o Rei preencher

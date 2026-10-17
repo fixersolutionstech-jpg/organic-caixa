@@ -1,5 +1,5 @@
 #!/data/data/com.termux/files/usr/bin/bash
-# sms-organic.sh — lê SMS novos (+842424, STD Bank, M-Pesa, e-Mola), envia ao GAS e avisa para aprovar.
+# sms-organic.sh — lê SMS novos (+842424, STD Bank, Millennium BIM, M-Pesa, e-Mola), envia ao GAS e avisa para aprovar.
 # Requer no Termux: pkg install termux-api jq curl  (+ app Termux:API instalada, permissão de SMS)
 # Corre de 15 em 15 min (mínimo do Android): termux-job-scheduler --script ~/organic/sms-organic.sh --period-ms 900000 --persisted true
 # Ao domingo, depois das 18h, também lembra a revisão semanal (uma vez por semana).
@@ -9,7 +9,7 @@ source "$DIR/config.sh"            # define GAS_URL, GAS_TOKEN, PWA_URL (e opcio
 ULTIMO="$DIR/.ultimo_sms"
 LEMB="$DIR/.ultimo_lembrete"
 DESDE="${DESDE:-2026-10-01}"       # ignora SMS anteriores a esta data (o Organic recomeçou a 1 de Outubro)
-REMETENTES='842424|STD|M-?PESA|E-?MOLA'
+REMETENTES='842424|STD|M-?PESA|E-?MOLA|BIM|MILLENNIUM'
 [ -f "$ULTIMO" ] || echo 0 > "$ULTIMO"
 ult=$(cat "$ULTIMO")
 

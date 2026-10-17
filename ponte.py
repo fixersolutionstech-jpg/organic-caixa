@@ -2,10 +2,12 @@
 ponte.py — leva os movimentos aprovados na PWA para o Organic, sem nunca escrever no Excel.
 
 Uso:
-  python ponte.py                 importa: Sheet -> lote JSON -> organic.py propor (folha Pendentes)
+  python ponte.py                 importa: Sheet (aprovados na PWA E SMS ainda por aprovar) -> lote JSON -> organic.py propor (folha Pendentes)
+                                  o Rei só decide no Organic: aprovar / corrigir / regra
   python ponte.py --seco          mostra o lote que seria criado; não escreve nada
   python ponte.py --saldos        só copia os saldos de Contas para a Sheet (a PWA mostra-os)
   python ponte.py --revisao       revisão semanal: últimos 7 dias do Diario, pendentes, saldos; actualiza _Estado.md
+  python ponte.py --conferir      confere o saldo M-Pesa dos SMS com o saldo calculado pelos movimentos da Sheet
   python ponte.py --de ficheiro   usa movimentos de um JSON local (testes); não toca na Sheet
 
 Requer: pip install requests openpyxl
@@ -14,6 +16,7 @@ O registo oficial é Contabilidade.xlsx: só scripts/organic.py do Organic escre
 """
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -79,6 +82,15 @@ def gas(cfg, corpo=None, **params):
     return j
 
 
+def e_std(m):
+    """STD Bank é conta da Fixer (STD Fixer 460): fica fora do Organic. 'Banco' com SMS do Millennium BIM ou registo manual é pessoal."""
+    if m.get("conta") == "Banco Standard":
+        return True
+    if m.get("conta") == "Banco" and m.get("sms"):
+        return not re.search(r"MILLENNIUM|MILLENIUM|BIM", m["sms"].upper())
+    return False
+
+
 def conta(c):
     if c not in CONTAS:
         raise ValueError(f"conta desconhecida na PWA: {c!r}")
@@ -86,9 +98,23 @@ def conta(c):
 
 
 def para_lote(m):
+    """Converte um movimento da PWA num movimento do lote do Organic, com a confiança ajustada ao estado."""
+    d, aviso = _para_lote(m)
+    if d and m.get("estado") == "pendente":
+        generico = (m.get("descricao") or "") == "SMS por classificar" or not m.get("categoria")
+        d["confianca"] = "baixa" if generico else "media"
+        d["nota"] = (d.get("nota", "") + " SMS sem aprovação na PWA: confirmar no Organic").strip()
+    return d, aviso
+
+
+def _para_lote(m):
     """Converte um movimento da PWA num movimento do lote do Organic. Devolve (dict|None, aviso|None)."""
+    if not float(m.get("valor") or 0):
+        return None, f"{m['id']}: valor 0 ({m.get('descricao')}) — ignorado"
     base = {"data": m["data"], "referencia": m["id"],
             "fonte": "caixa-sms" if m.get("origem") == "sms" else "caixa-pwa", "confianca": "alta"}
+    if e_std(m):
+        return None, f"{m['id']}: movimento do STD Bank (conta da Fixer) fora do Organic — {m['valor']:.2f} MT, {m['data']}"
     desc = m.get("descricao") or m.get("categoria") or ""
     v = float(m["valor"])
     cat = m.get("categoria", "")
@@ -151,6 +177,101 @@ def saldos(xlsx):
     return {k: round(v, 2) for k, v in s.items()}
 
 
+RE_SALDO = re.compile(r"saldo\s+M-?Pesa\s+e\s+de\s+([\d.,]+)\s*MT", re.I)
+
+
+def num(t):
+    t = t.rstrip(".,")
+    if "," in t and "." in t:
+        t = t.replace(",", "") if t.rfind(".") > t.rfind(",") else t.replace(".", "").replace(",", ".")
+    elif "," in t:
+        t = t.replace(",", ".") if re.search(r",\d{2}$", t) else t.replace(",", "")
+    return float(t)
+
+
+def efeito_mpesa(m):
+    """Quanto o movimento mexe no saldo M-Pesa (a taxa é um movimento à parte)."""
+    v = float(m["valor"])
+    if m["tipo"] == "transferencia":
+        return (-v if m["conta"] == "M-Pesa" else 0) + (v if m.get("conta_destino") == "M-Pesa" else 0)
+    if m["conta"] != "M-Pesa":
+        return 0
+    return v if m["tipo"] == "entrada" else -v
+
+
+RE_QUANDO = re.compile(r"(\d{1,2})/(\d{1,2})/(\d{2,4})\s+as\s+(\d{1,2}):(\d{2})\s*(AM|PM)", re.I)
+
+
+def quando(m):
+    """Hora real do SMS M-Pesa ('aos 3/10/26 as 11:20 AM'); sem ela, a data de criação. A ordem da Sheet não é a do tempo."""
+    q = RE_QUANDO.search(m.get("sms") or "")
+    if not q:
+        return (m.get("criado_em") or m["data"]).replace("T", " ")
+    d, mes, a, h, mi, ap = int(q[1]), int(q[2]), int(q[3]), int(q[4]), int(q[5]), q[6].upper()
+    h = h % 12 + (12 if ap == "PM" else 0)
+    return f"{a + 2000 if a < 100 else a:04d}-{mes:02d}-{d:02d} {h:02d}:{mi:02d}"
+
+
+def todos_movimentos(cfg):
+    """Todos os movimentos (acção 'todos' do GAS). Se o GAS ainda for antigo: pendentes + recentes + por importar (incompleto)."""
+    j = gas(cfg, acao="todos")
+    if "movimentos" in j:
+        return j["movimentos"]
+    print("  (GAS antigo: sem a acção 'todos', a conferência pode dar diferenças falsas até haver nova versão)")
+    vistos = {}
+    for m in gas(cfg, acao="listar")["pendentes"] + gas(cfg, acao="listar")["recentes"] + gas(cfg, acao="exportar")["movimentos"]:
+        vistos[m["id"]] = m
+    return list(vistos.values())
+
+
+def conferir(movs, auto=False):
+    """Segue o saldo M-Pesa SMS a SMS: saldo anterior + movimentos tem de dar o saldo do SMS seguinte.
+    Uma diferença = falta um movimento (SMS não lido, levantamento sem SMS, etc.). Devolve o nº de diferenças."""
+    grupos = {}
+    for m in sorted((x for x in movs if x.get("estado") != "rejeitado"), key=quando):
+        if efeito_mpesa(m) == 0:
+            continue
+        grupos.setdefault(re.sub(r"-tx$", "", str(m["id"])), []).append(m)
+    corrente, ancora, difs, ultimo_sms, flut = None, None, [], None, {}
+    for gid, ms in grupos.items():
+        ef = round(sum(efeito_mpesa(m) for m in ms), 2)
+        sms = next((x for m in ms for x in [RE_SALDO.search(m.get("sms") or "")] if x), None)
+        if not sms and not any(RE_QUANDO.search(m.get("sms") or "") for m in ms):
+            flut[gid] = ef  # sem saldo nem hora (ex. recibo Credelec, registo manual): não se sabe onde encaixa na cadeia
+            continue
+        if corrente is None:
+            if sms:
+                corrente = ancora = num(sms.group(1))
+                ultimo_sms = (corrente, ms[0]["data"])
+            continue
+        corrente = round(corrente + ef, 2)
+        if sms:
+            lido = num(sms.group(1))
+            dif = round(lido - corrente, 2)
+            if abs(dif) > 0.009:
+                expl = next((g for g, e in flut.items() if abs(e - dif) < 0.009), None)
+                if expl:
+                    flut.pop(expl)
+                else:
+                    difs.append((ms[0]["data"], gid, lido, corrente, dif))
+            corrente, ultimo_sms = lido, (lido, ms[0]["data"])
+    if ancora is None:
+        if not auto:
+            print("Conferência M-Pesa: ainda não há SMS com saldo.")
+        return 0
+    print(f"Conferência M-Pesa — último saldo nos SMS: {ultimo_sms[0]:,.2f} MT ({ultimo_sms[1]}); saldo pelos movimentos: {corrente:,.2f} MT")
+    for d, gid, lido, calc, dif in difs:
+        sinal = "entrou" if dif > 0 else "saiu"
+        print(f"  ! {d} {gid}: SMS diz {lido:,.2f}, movimentos dão {calc:,.2f} -> {abs(dif):,.2f} MT {sinal} sem registo antes deste SMS")
+    if abs(corrente - ultimo_sms[0]) > 0.009:
+        print(f"  ! Depois do último SMS há movimentos manuais M-Pesa que o mexem em {corrente - ultimo_sms[0]:+,.2f} MT")
+    if flut:
+        print("  · sem hora no SMS (não entram na cadeia): " + ", ".join(f"{g} {e:+,.2f}" for g, e in flut.items()))
+    if not difs and abs(corrente - ultimo_sms[0]) <= 0.009:
+        print("  OK — os movimentos explicam todos os saldos dos SMS.")
+    return len(difs)
+
+
 def revisao(cfg, xlsx, script):
     """Resumo dos últimos 7 dias (só leitura do Diario) + pendentes + saldos."""
     from collections import defaultdict
@@ -183,6 +304,10 @@ def revisao(cfg, xlsx, script):
     except SystemExit as e:
         print("  PWA indisponível:", e)
     print("  Saldos:", ", ".join(f"{k} {v:,.2f}" for k, v in saldos(xlsx).items() if v) or "tudo a zero")
+    try:
+        conferir(todos_movimentos(cfg))
+    except SystemExit as e:
+        print("  Conferência M-Pesa indisponível:", e)
     subprocess.run([sys.executable, str(script), "estado"], cwd=str(script.parent.parent))
 
 
@@ -193,12 +318,16 @@ def main(a):
     base, xlsx, script = caminhos(cfg)
     if "--revisao" in a:
         return revisao(cfg, xlsx, script)
+    if "--conferir" in a:
+        return conferir(todos_movimentos(cfg))
 
     if not so_saldos:
         if de:
             movs = json.loads(Path(de).read_text(encoding="utf-8"))
         else:
             movs = gas(cfg, acao="exportar")["movimentos"]
+            ids = {m["id"] for m in movs}
+            movs += [m for m in gas(cfg, acao="listar")["pendentes"] if m["id"] not in ids]  # SMS por aprovar: vão já para o Organic
         movs.sort(key=lambda m: (m["data"], m.get("criado_em", "")))
         lote, feitos = [], []
         for m in movs:
@@ -213,6 +342,11 @@ def main(a):
                 lote.append(d)
             feitos.append(m["id"])
         print(f"{len(movs)} aprovado(s) na PWA -> {len(lote)} para o Organic")
+        if not de:
+            try:
+                conferir(todos_movimentos(cfg), auto=True)
+            except SystemExit as e:
+                print("Conferência M-Pesa indisponível:", e)
         if seco:
             print(json.dumps(lote, ensure_ascii=False, indent=1))
             return

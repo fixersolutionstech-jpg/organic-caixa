@@ -30,6 +30,14 @@ const casos = [
     { ignorar: true }],
   ['MPESA', 'Confirmado DJ00TEST06F. Registamos uma operacao de compra no valor de 80.00MT e a taxa foi de 0.00MT na entidade EDM com referencia XXX aos 1/10/26 as 6:09 PM. O teu novo saldo M-Pesa e de 12.16MT.',
     { ignorar: true }],
+  ['BIM', 'A conta XXX foi debitada no valor de 3000.00 MZN as 19:18 do dia 16/10/26, comissao 9.50 MZN. Em caso de duvida, ligue 8003500. Millennium bim',
+    { tipo: 'saida', valor: 3000, conta: 'Banco', taxa: 9.5, data: '2026-10-16', descricao: 'Débito BIM' }],
+  ['BIM', 'A conta XXX recebeu o valor de 3939.84 MZN as 18:23 do dia 15/10/26. Em caso de duvida, ligue 8003500. Millennium bim',
+    { tipo: 'entrada', valor: 3939.84, conta: 'Banco', taxa: 0, data: '2026-10-15', descricao: 'Recebido BIM' }],
+  ['BIM', 'A conta XXX foi debitada 284.61 MZN referente a comissao anual do cartao de debito com terminacao XXX. Em caso de duvida, ligue 8003500.Millenium bim',
+    { tipo: 'saida', valor: 284.61, conta: 'Banco', categoria: 'Taxas', taxa: 0 }],
+  ['BIM', 'Millennium mobile Levantamento IZI ATM O seu codigo de levantamento 39156252 para o montante 500,00 Grato pela preferencia',
+    { tipo: 'transferencia', valor: 500, conta: 'Banco', conta_destino: 'Caixa', taxa: 0, id: 'izi39156252' }],
 ];
 
 let falhas = 0;
