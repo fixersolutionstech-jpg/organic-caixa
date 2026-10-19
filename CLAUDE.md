@@ -40,7 +40,7 @@ ponte.py também copia os saldos de `Contas` para a Sheet (a PWA só os mostra)
 - [x] Configurar clasp (script ligado à Sheet; `clasp push` + `clasp deploy -i <id>` mantém o URL; `.clasp.json` fora do Git)
 - [x] `.env` preenchido (falta trocar EXCEL_PATH por ORGANIC_DIR). O teste anterior do `organic.py` só provou que corre, não que o desenho está certo
 - [ ] NÃO registar saldos iniciais na PWA (já estão em `Contas`)
-- [x] Fase 2: mapeamento aprovado (Caixa e M-Pesa → CASH; e-Mola → EMOLA; Banco → BANCO; categorias em `ponte.py`)
+- [x] Fase 2: mapeamento aprovado (Caixa e M-Pesa → CASH; e-Mola → CASH (conta EMOLA eliminada no Organic a 2026-10-19); Banco → BANCO; categorias em `ponte.py`)
 - [x] Fase 3 (código): `ponte.py` testado com cópia do Organic e movimentos fictícios; `Code.gs` com acções `importado` e `saldos` e taxa M-Pesa como movimento à parte
 - [x] Fase 3 (deploy) 2026-10-06: GAS @7, Pages com `organic-v2`; Organic reiniciado a 2026-10-01 (histórico em `Contabilidade\Historico\`)
 - [x] `ponte.py` (sem `.env` para o Organic: usa a pasta THE ORANIC por defeito) com `--seco`, `--saldos`, `--revisao`; teste ponta a ponta feito com 1 movimento

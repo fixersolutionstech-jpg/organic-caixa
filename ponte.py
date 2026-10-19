@@ -31,7 +31,7 @@ AQUI = Path(__file__).parent
 ORGANIC_POR_DEFEITO = r"C:\Users\Edson Adolfo\Desktop\AI\The castelo do Rei multiplicado\THE ORANIC"
 
 # Contas da PWA -> contas do Organic (Caixa e M-Pesa estão unidos em CASH)
-CONTAS = {"Caixa": "CASH", "M-Pesa": "CASH", "e-Mola": "EMOLA", "Banco": "BANCO"}
+CONTAS = {"Caixa": "CASH", "M-Pesa": "CASH", "e-Mola": "CASH", "Banco": "BANCO"}
 
 # Categorias da PWA -> código do Plano_Contas. Patrimoniais tratadas à parte (FIXER).
 CAT_SAIDA = {
